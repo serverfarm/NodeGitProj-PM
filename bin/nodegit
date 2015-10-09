@@ -1,0 +1,105 @@
+#!/usr/bin/perl
+# Deploy prepper with minimal dependenceies for a Node.js / NPM / Git project.
+# http://stackoverflow.com/questions/5195859/push-a-tag-to-a-remote-repository-using-git
+# http://semver.org/
+# To Install easier on Win/MacOSX, Install cpanminus
+use strict;
+use warnings;
+use Data::Dumper;
+$Data::Dumper::Indent = 1;
+$Data::Dumper::Terse = 1;
+use Getopt::Long; # CORE
+use Sys::Hostname; # CORE
+use NodeGitProj;
+use strict;
+use warnings;
+my @pspec = ('version=s', 'exec','nocheck','force','conf=s');
+my %para = ('version' => '', 'conf' => './package.json');
+my $op = shift(@ARGV) || '';
+GetOptions (\%para, @pspec);
+
+my $ops = {
+  # Do not use for now.
+  'relinc' => sub {
+     my ($cfg) = @_;
+     die("relinc Not Available (for now) !");
+     # https://docs.npmjs.com/cli/version
+     `npm --no-git-tag-version version patch`;
+  },
+  # Prep (by package.json), additionally allow params to inc version or rc
+  'relprep' => sub {
+     my ($cfg) = @_;
+     #print(Dumper($cfg));
+     my $vernew = my $tag = $cfg->taglbl();
+     my $verlast = $cfg->lastver(); # Last Tag
+     if (!$verlast) {die("Last Version could not be derived. Not a project dir with '.git' repo  ?");}
+     print(STDERR "$cfg->{'name'} Current Ver: $vernew (Last: $verlast)\n");
+     
+     #TEST:newversiongood($vernew, $vernew);
+     #TEST:newversiongood($verlast, $vernew);
+     # TODO: add nocheck
+     if ($para{'nocheck'}) {print(STDERR "Skip version comparison / check for tag to be created\n");}
+     else {
+       eval { NodeGitProj::newversiongood($vernew, $verlast); };
+       if ($@) {die("Version check problem:".$@.". Check your package.json. To override, use --nocheck\n");}
+     }
+     # Follow by going to remote ...
+     if ($para{'exec'}) {
+       eval {
+         NodeGitProj::createtag($vernew, "Release $vernew ($cfg->{'date'})");
+         NodeGitProj::storetag();
+       };
+       if ($@) {print(STDERR "Error in tag creation or storing tag: $@");}
+       
+     }
+     # Being stubborn and doing both --nocheck and --exec may lead to git error : fatal: tag '0.5.2-rc.0.2' already exists
+     else {print(STDERR "Run with --exec to create tag (for curr version above)\n");}
+  },
+  # Deploy & Restart
+  'deploy' => sub {
+     my ($cfg) = @_;
+     my $ver = $para{'version'};
+     if (!$ver) { die("Missing --version !"); }
+     # current-deployed vs. to-be-deployed
+     print(STDERR "Deploying (fetch & checkout) Version '$ver'\n");
+     $cfg->deploytag($ver);
+     # TODO: Make npm and bower updates
+     #$cfg->deps_install();
+     # Problems:
+     # - bower could interactively ask for Angular version (!!)
+     # - Do npm and bower modules directly installed from Git work ok (??)
+     # - NPM global (-g) module installs "simple run" is not supported by NPM
+     #  - TODO: Move to manage NPM Modules locally for better NPM automation support
+     # $cfg->deps_install(); # Can we get the client dir from package.json (NOT, but app config.staticroot
+     $cfg->server_restart();
+     # 
+     my $host = hostname();
+     # Use name or description
+     $cfg->inform("$cfg->{'name'} Version $ver Deployed", "Deployed on $cfg->{'date'} by $ENV{'user'}\@$host");
+  },
+  # ONLY Restart app server
+  'restart' => sub {
+     my ($cfg) = @_;
+     $cfg->server_restart();
+     print(STDERR "Run \"pm2 status $cfg->{'main'}\" later to monitor status\n");
+  },
+  'taglist' => sub {
+     my ($cfg) = @_;
+     # Half-deploy (fetch but do not checkout)
+     $cfg->deploytag(); # $ver, 'noco' => 1
+     my @tags = $cfg->gettags();
+     print(STDERR "Tags available\n", map({"- $_\n"} @tags));
+  },
+  # Increment RC number to the next available one (<= 99)
+  #'rcinc' => sub {};
+};
+#print(STDERR Dumper(\%para)." Op:'$op'\n");
+
+my @ops = keys(%$ops); # For below Help only
+if ((!$op) || (! $ops->{$op})) {
+  no strict ('refs');
+  die("No op: '$op'. Enter one of ops: @ops\n");
+} # $op = 'relprep';
+my $cfg = NodeGitProj->new(%para);
+$ops->{$op}->($cfg);
+
