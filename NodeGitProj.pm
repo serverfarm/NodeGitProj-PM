@@ -11,7 +11,7 @@ use Mail::Sendmail; # libmail-sendmail-perl
 use Date::ISO8601;  # libdate-iso8601-perl
 use Sys::Hostname; # CORE
 use Cwd;
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 # my $appcfgfname = "$appid.conf.json";
 
 =head1 NAME
@@ -38,6 +38,32 @@ automated.
 You can use NodeGitProj on the module / API level or use the shipped
 command line tool to run the deployment steps.
 
+=head2 CONFIG VARIABLES USED FROM package.json
+
+=over 4
+
+=item * name - for looking up additional app specific config file for the app
+
+=item * description - for naming the app in informative messages and email
+
+=item * main - executable for starting / restarting the app server
+
+=item * version - string for tagging the release version
+
+=item * contributors - for sending email on release deployment
+
+=item * devDependencies - for seeing what process manager Node app might use
+
+=back
+
+=head2 CONFIG OVERRIDES
+
+Some settings related to tasks that NodeGitProj carries out are not easily presented (especially in standard)
+package.json file. For these things environment variables are used
+
+    NODEGIT_FROM - Sender email address for the deployment email notifications.
+
+These variables are best mainatained in a local shell config file (e.g. ~/.bashrc)
 
 =head2 $np->lastver()
 
@@ -95,7 +121,7 @@ package.json file.
 (Read more on: https://docs.npmjs.com/files/package.json).
 Keyword params in %opts:
 
-=over4
+=over 4
 
 =item * conf - Full custom (absolute) path to package.json (default "./package.json")
     
@@ -132,8 +158,10 @@ sub new {
   # TODO:
   # - Try this from base directory of package.json
   # - Allow overriding in %opts
-  my $appconf = $c{'appconf'} ? "$c{'appconf'}" : "$cfg->{'name'}.conf.json";
+  my $appconf = $c{'appconf'} ? "$c{'appconf'}" : "./$cfg->{'name'}.conf.json";
+  print(STDERR "Found appconfig: $appconf\n");
   if (-f $appconf) {
+    
     my $appcfg = decode_json(`cat $appconf`);
     $cfg->{'appcfg'} = $appcfg;
   }
@@ -250,7 +278,7 @@ sub server_restart {
    # NEW: Do not mandate to have
    #if (`which pm2` && $?) {die("pm2 utility not installed");}
    my $dd = $cfg->{'devDependencies'};
-   if ( ! $dd->{'pm2'}) { die("pm2 not listed as dep"); }
+   if ( ! $dd->{'pm2'}) { print(STDERR "pm2 not listed as dep"); return; }
    my @pmops = ("status","stop","start","status");
    my @cmds = map({"pm2 $_ $cfg->{'main'}";} @pmops);
    my $delay = 1;
@@ -268,8 +296,8 @@ sub server_restart {
 =head2 $np->inform($subj, $body)
 
 Inform people registered as 'contributors' in package.json by an email.
-If left out the $subj and $body are defaulted to informative values related
-to appname, version, time of deployment and user identity of deploying
+If left out the $subj and $body are defaulted to informative values conveying
+the appname, version, time of deployment and user identity of deploying
 OS user.
 
 =cut
@@ -281,39 +309,77 @@ sub inform {
    # NEW: Formulate default messages
    my $host = hostname();
    my $ver = $cfg->taglbl();
-   $title = $title || "$cfg->{'name'} Version '$ver' Deployed";
-   $body  = $body  || "Deployed on $cfg->{'date'} by $ENV{'user'}\@$host";
+   $title = $title || "$cfg->{'description'} Version '$ver' Deployed";
+   $body  = $body  || "Deployed on $cfg->{'date'} by $ENV{'USER'}\@$host";
+   # Figure out SMTP From: Address
+   my $from = $cfg->emailfrom() || "$ENV{'USER'}\@someplace.com";
    # TODO: Make swe
    my $mail = {
      To => join(';', @mlist),
-     From => "$ENV{'USER'}\@someplace.com",
+     From => $from,
      Subject => $title,
      Message => $body,
    };
    sendmail(%$mail) or die $Mail::Sendmail::error;
 }
 
+# Look for Deployment mail sender (SMTP "From:" field) from variety of config locations.
+sub emailfrom {
+   my ($cfg) = @_;
+   my $clist = $cfg->{'contributors'};
+   # Email directly in %ENV
+   if (my $f = $ENV{'NODEGIT_FROM'}) {return($f);}
+   # ENV: Index to contributor list
+   elsif (my $i = $ENV{'NODEGIT_FROM_IDX'}) {
+     
+     if (($i+1) > scalar(@$clist)) {die("Index to contributors is exceeding list boundaries !");}
+     return($clist->[$i]->{'email'});
+   }
+   # In package.json "config" Object "emailfrom"
+   elsif (my $f2 = $cfg->{'config'}->{'emailfrom'}) {return($f2);}
+   elsif (ref($cfg->{'author'}) eq 'HASH') { return($cfg->{'author'}->{'email'}); }
+   # Try first of 'contributors' ? Or one at idx
+   elsif (ref($clist->[0]) eq 'HASH') {}
+   # Exhauseted all options !
+   return '';
+}
+
+=head2 $np->deps_install()
+
+Install or update NPM and Bower dependencies.
+Resolve document root for application for Bower installation part.
+
+=cut
 sub deps_install {
   my ($cfg, $docroot) = @_;
+  DEBUG:print(Dumper($cfg));
   # Find out docroot
   if ($docroot) {} # Explicit docroot passed - No probing actions
   elsif (my $sr = $cfg->{'appcfg'}->{'staticroot'}) {
+     print(STDERR "docroot(appcfg): $sr\n");
      # Current dir + staticroot value
      $docroot = "./$sr";
   }
+  else { $docroot = "./"; }
   # Ensure docroot exists
   if (! -d $docroot) {die("No static content root found ('$docroot')");}
   # Ensure docroot has bower.json and "bower_components"
   if (! -f "$docroot/bower.json") {die("No bower.json found");}
   if (! -d "$docroot/bower_components") {die("No 'bower_components' in docroot !");}
   # NPM
-  # Must have existing "node_modules"
+  # Must have existing "node_modules" (makes this not valid for first time install)
   if (-d "./node_modules") { `npm install`; }
   # Bower
   my $cwd = getcwd();
   chdir($docroot);
   `bower install`;
   chdir($cwd);
+  #if ($?) {print(STDERR "Error from Bower Install (in '$docroot'): $?");}
 }
 
+=head1 TODO
+
+Utilize "scripts" and "config" sections of package.json more effectively.
+
+=cut
 1;

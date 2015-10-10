@@ -3,6 +3,41 @@
 # http://stackoverflow.com/questions/5195859/push-a-tag-to-a-remote-repository-using-git
 # http://semver.org/
 # To Install easier on Win/MacOSX, Install cpanminus
+=head1 NAME
+
+nodegit - Command line wrapper for managing Node.JS / Git releases and deployments
+
+=head1 SYNOPSIS
+
+    # List tags (first fetches tags to catch up, but keeps current branch/tag on workarea)
+    nodegit taglist
+    # Prep for release
+    # - Checks validity / availability of package.json "version" for a Git Tag
+    # - Creates tag and pushes it to default remote
+    # Default is  a dryrun, use --exec to actually run
+    nodegit relprep --exec
+    # Deploy at the application server
+    # - Fetches all available tags
+    # - Checkout version tag passed as --version
+    # - Restart App Server
+    # - Inform project contributors / participants by email
+    nodegit deploy --version 0.5.2-rc.1.8
+    # Only Restart App Server
+    nodegit restart
+    # Install NPM and Bower dependencies
+    nodegit depsinst
+
+=head1 DESCRIPTION
+
+Quick Preview Installation from Git:
+
+cd /tmp/
+git clone ssh://git@github.com/ohollmen/NodeGitProj-PM.git
+cd NodeGitProj-PM
+perldoc ./NodeGitProj.pm
+
+=cut
+
 use strict;
 use warnings;
 use Data::Dumper;
@@ -64,7 +99,7 @@ my $ops = {
      print(STDERR "Deploying (fetch & checkout) Version '$ver'\n");
      $cfg->deploytag($ver);
      # TODO: Make npm and bower updates
-     #$cfg->deps_install();
+     $cfg->deps_install();
      # Problems:
      # - bower could interactively ask for Angular version (!!)
      # - Do npm and bower modules directly installed from Git work ok (??)
@@ -75,7 +110,7 @@ my $ops = {
      # 
      my $host = hostname();
      # Use name or description
-     $cfg->inform("$cfg->{'name'} Version $ver Deployed", "Deployed on $cfg->{'date'} by $ENV{'user'}\@$host");
+     $cfg->inform("$cfg->{'name'} Version $ver Deployed", "Deployed on $cfg->{'date'} by $ENV{'USER'}\@$host");
   },
   # ONLY Restart app server
   'restart' => sub {
@@ -89,6 +124,10 @@ my $ops = {
      $cfg->deploytag(); # $ver, 'noco' => 1
      my @tags = $cfg->gettags();
      print(STDERR "Tags available\n", map({"- $_\n"} @tags));
+  },
+  'depsinst' => sub {
+     my ($cfg) = @_;
+     $cfg->deps_install();
   },
   # Increment RC number to the next available one (<= 99)
   #'rcinc' => sub {};
