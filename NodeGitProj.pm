@@ -352,7 +352,7 @@ Resolve document root for application for Bower installation part.
 =cut
 sub deps_install {
   my ($cfg, $docroot) = @_;
-  DEBUG:print(Dumper($cfg));
+  #DEBUG:print(Dumper($cfg));
   # Find out docroot
   if ($docroot) {} # Explicit docroot passed - No probing actions
   elsif (my $sr = $cfg->{'appcfg'}->{'staticroot'}) {

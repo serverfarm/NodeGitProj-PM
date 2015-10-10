@@ -97,7 +97,7 @@ my $ops = {
      if (!$ver) { die("Missing --version !"); }
      # current-deployed vs. to-be-deployed
      print(STDERR "Deploying (fetch & checkout) Version '$ver'\n");
-     $cfg->deploytag($ver);
+     $cfg->deploytag($ver, %para);
      # TODO: Make npm and bower updates
      $cfg->deps_install();
      # Problems:
