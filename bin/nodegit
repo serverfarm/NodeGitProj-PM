@@ -9,32 +9,44 @@ nodegit - Command line wrapper for managing Node.JS / Git releases and deploymen
 
 =head1 SYNOPSIS
 
-    # List tags (first fetches tags to catch up, but keeps current branch/tag on workarea)
+    # List tags
+    # - Fetches tags to catch up, but keeps current branch/tag on workarea.
+    # - Fetches _all_ tags and branches to repo as side affect and can thus be also
+    # used to do a comprehensive fetch even if listing tags is not the interesting part
     nodegit taglist
+    
     # Prep for release
     # - Checks validity / availability of package.json "version" for a Git Tag
     # - Creates tag and pushes it to default remote
-    # Default is  a dryrun, use --exec to actually run
+    # Default is a dryrun, use --exec to actually run
     nodegit relprep --exec
-    # Deploy at the application server
+    
+    # Deploy tag at the application server
     # - Fetches all available tags
     # - Checkout version tag passed as --version
     # - Restart App Server
     # - Inform project contributors / participants by email
     nodegit deploy --version 0.5.2-rc.1.8
+    # Impatiently deploy master
+    nodegit deploy --version master
+    
     # Only Restart App Server
     nodegit restart
-    # Install NPM and Bower dependencies
+    
+    # Only Install NPM and Bower dependencies
     nodegit depsinst
 
 =head1 DESCRIPTION
 
-Quick Preview Installation from Git:
+Command line wrapper "nodegit" gets installed with the NodeGitProj-PM package installation.
 
-cd /tmp/
-git clone ssh://git@github.com/ohollmen/NodeGitProj-PM.git
-cd NodeGitProj-PM
-perldoc ./NodeGitProj.pm
+Quick Preview installation from Git (under /tmp):
+
+    cd /tmp/
+    git clone ssh://git@github.com/ohollmen/NodeGitProj-PM.git
+    cd NodeGitProj-PM
+    perldoc ./bin/nodegit
+    perldoc ./NodeGitProj.pm
 
 =cut
 
