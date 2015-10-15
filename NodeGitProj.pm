@@ -11,7 +11,7 @@ use Mail::Sendmail; # libmail-sendmail-perl
 use Date::ISO8601;  # libdate-iso8601-perl
 use Sys::Hostname; # CORE
 use Cwd;
-our $VERSION = '0.1.1';
+our $VERSION = '0.1.2';
 # my $appcfgfname = "$appid.conf.json";
 
 =head1 NAME
