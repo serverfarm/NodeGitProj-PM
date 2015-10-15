@@ -25,6 +25,7 @@ NodeGitProj - Manage the Deployment lifecycle of Git Stored Node.js App.
     eval {
       $np = NodeGitProj->new('conf' => "/path/to/package.json");
       $np->deploytag($ver);
+      $np->deps_install();
       $np->server_restart();
       $np->inform("Ver. $ver Deployed");
     };
@@ -255,8 +256,11 @@ sub deploytag {
    # Query tags (again)
    my @tags = $cfg->gettags();
    # Allow intentionally to skip checkout (by passing no version)
-   if (!$ver || $c{'noco'}) {return;}
-   if (!grep({$_ eq $ver;} @tags)) {die("Version tag '$ver' not available (Tags: @tags)");}
+   if (!$ver ) {return;} # || $c{'noco'}
+   # Consider "master" as special version tag
+   if ($ver eq 'master') { $cmds[1] = "git checkout master";}
+   elsif (!grep({$_ eq $ver;} @tags)) {die("Version tag '$ver' not available (Tags: @tags)");}
+   print(STDERR "Checking out by: $cmds[1]\n");
    $out = `$cmds[1]`;
    if ($?) {die("Git Checkout (of $ver) failed: $out");}
    1;
@@ -266,7 +270,7 @@ sub deploytag {
 
 Restart (Node) Application server using one of popular Node process managers.
 The process manager is looked up from package.json "devDependencies", looking
-for "pm2" and "forever" in that order
+for "pm2" and "forever" in that order.
 Typically this is done after deployment. Lookup package.json member
 'main' for the app main executable.
 
@@ -278,9 +282,19 @@ sub server_restart {
    # NEW: Do not mandate to have
    #if (`which pm2` && $?) {die("pm2 utility not installed");}
    my $dd = $cfg->{'devDependencies'};
-   if ( ! $dd->{'pm2'}) { print(STDERR "pm2 not listed as dep"); return; }
-   my @pmops = ("status","stop","start","status");
-   my @cmds = map({"pm2 $_ $cfg->{'main'}";} @pmops);
+   my @pms = ('pm2','forever'); # Supported process managers
+   my $pm = '';
+   my @mypms = map({$dd->{$_} ? $_ : ();} @pms); # Find pm in use
+   if ( ! @mypms) { print(STDERR "no process manager (@pms) listed as dev.dep."); return; }
+   $pm = shift(@mypms);
+   # Whatever  supported by particular pm (status N/A on forever, use list)
+   my %pmops_bypm = (
+     'pm2' => ["status","stop","start","status"],
+     'forever' => ["list","stop","start","list"]); # 
+   #OLD: my @pmops = ("stop","start");
+   my @pmops = @{$pmops_bypm{$pm}};
+   print(STDERR "Call: @pmops\n");
+   my @cmds = map({"$pm $_ $cfg->{'main'}";} @pmops);
    my $delay = 1;
    my $i = 0;
    for (@cmds) {
