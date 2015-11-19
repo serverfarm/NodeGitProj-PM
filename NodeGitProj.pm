@@ -239,8 +239,9 @@ Throw exceptions on failing fetch or checkout.
 =cut
 sub deploytag {
    my ($cfg, $ver, %c) =@_;
-   if (!$ver) {$ver = '';} # to be defined
+   if (!$ver) {$ver = '';} # just to be defined (for strict)
    my $currver = $cfg->{'version'};
+   # Should not affect 'master' deployment
    if ($ver && !$c{'force'} && ($ver eq $cfg->taglbl())) {
       die("Tag to Deploy seems to be same as one for current deployment. Use 'force' to override.");
       return;
@@ -251,6 +252,7 @@ sub deploytag {
    #for my $c (@cmds) {
    #   print(STDERR "$c\n");
    #}
+   # FETCH !
    my $out = `$cmds[0]`;
    if ($?) { die("Git Fetch failed: $out"); }
    # Query tags (again)

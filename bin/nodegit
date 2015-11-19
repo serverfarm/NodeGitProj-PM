@@ -15,7 +15,7 @@ nodegit - Command line wrapper for managing Node.JS / Git releases and deploymen
     # used to do a comprehensive fetch even if listing tags is not the interesting part
     nodegit taglist
     
-    # Prep for release
+    # Prep for tagged release
     # - Checks validity / availability of package.json "version" for a Git Tag
     # - Creates tag and pushes it to default remote
     # Default is a dryrun, use --exec to actually run
