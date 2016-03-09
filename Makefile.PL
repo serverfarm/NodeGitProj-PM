@@ -12,8 +12,9 @@ WriteMakefile(
   # Class name => ver
   'PREREQ_PM'    => {
     'Data::Dumper' => 0,
-    'JSON' => 0,
-    'Mail::Sendmail' => 0, # 
+    'JSON' => 0, # libjson-perl
+    'Mail::Sendmail' => 0, # libmail-sendmail-perl
+    'Date::ISO8601' => 0, # libdate-iso8601-perl
   },
   # Ref to executables to be copied to INST_SCRIPT directory
   'EXE_FILES' => ['bin/nodegit'],
