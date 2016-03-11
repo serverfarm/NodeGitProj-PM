@@ -79,13 +79,17 @@ my $ops = {
      #print(Dumper($cfg));
      my $vernew = my $tag = $cfg->taglbl();
      my $verlast = $cfg->lastver(); # Last Tag
-     if (!$verlast) {die("Last Version could not be derived. Not a project dir with '.git' repo  ?");}
-     print(STDERR "$cfg->{'name'} Current Ver: $vernew (Last: $verlast)\n");
-     
-     #TEST:newversiongood($vernew, $vernew);
-     #TEST:newversiongood($verlast, $vernew);
-     # TODO: add nocheck
+     # NOTE: Not an error in case of repo NOT having earlier version tags !
+     if (!$verlast && !$para{'nocheck'}) {die("Last Version could not be derived. Not a project dir with '.git' repo  ?".
+        " Maybe there are no earlier (tagged) versions (Use --nocheck to override) ?");}
+     # TODO: Use $para{'nocheck'} conditionality here ?
+     if (!$para{'nocheck'}) { print(STDERR "$cfg->{'name'} Current Ver: '$vernew' (Last: '$verlast')\n"); }
+     else { print(STDERR "$cfg->{'name'} Forcing to create Ver: '$vernew'\n"); }
+     #TEST:NodeGitProj::newversiongood($vernew, $vernew);
+     #TEST:NodeGitProj::newversiongood($verlast, $vernew);
+     # Override checks
      if ($para{'nocheck'}) {print(STDERR "Skip version comparison / check for tag to be created\n");}
+     # Check by comparison (last vs. current) !
      else {
        eval { NodeGitProj::newversiongood($vernew, $verlast); };
        if ($@) {die("Version check problem:".$@.". Check your package.json. To override, use --nocheck\n");}
