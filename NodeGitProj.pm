@@ -164,8 +164,9 @@ sub new {
   my $appconf = $c{'appconf'} ? "$c{'appconf'}" : "./$cfg->{'name'}.conf.json";
   print(STDERR "Found appconfig: $appconf\n");
   if (-f $appconf) {
-    
-    my $appcfg = decode_json(`cat $appconf`);
+    my $cc = `cat $appconf`; # Config content
+    $cc =~ s/\r//g;
+    my $appcfg = decode_json($cc);
     $cfg->{'appcfg'} = $appcfg;
   }
   return($cfg);
