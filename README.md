@@ -2,6 +2,38 @@
 
 Manage the Deployment lifecycle of Git Stored Node.js App.
 
+# Installation
+
+## Basic Perl-based Install
+
+    # TODO: Perl cpan/cpanp(cpanplus)/cpanm(cpanminus) based install
+    # Module is not yet in cpan - cannot install it from CPAN (!)
+    cpanm JSON Mail::Sendmail Date::ISO8601
+    cd /tmp
+    git clone https://github.com/ohollmen/NodeGitProj-PM.git
+    cd NodeGitProj-PM
+    # Perl Makefile.PL install
+    perl Makefile.PL
+    make
+    sudo make install
+    
+
+## Debian install
+    
+    # Install deps
+    sudo apt-get install libjson-perl libmail-sendmail-perl libdate-iso8601-perl
+    # Git Clone, cd, Run Perl Makefile.PL install process
+    
+## MacOSX/Brew Install
+
+    # Use cpanminus to install
+    sudo brew install cpanminus
+    # Install dependencies
+    sudo cpanm JSON Mail::Sendmail Date::ISO8601
+    # Clone from Git (see above) ...
+    # Run Perl install process
+    perl Makefile.PL; make; sudo make install
+    
 # Quick Usage
 
 Main command line use cases for module
