@@ -86,7 +86,7 @@ sub lastver {
 
 =head2 NodeGitProj::taglbl()
 
-Create a semver-compatible (See: http://semver.org/) version tag string
+Create a semver-compatible (See: http://semver.org/) version tag string (not a Git tag, but only name)
 to use for Git tagging purposes.
 Allow package.json (non-standard) member "rc" to affect tag formation.
 If the "rc" field in package.json is set to 0 or not present, the tag label
@@ -145,7 +145,9 @@ sub new {
   my $cfgfname = $c{'conf'} || "package.json"; # PKG var ...
   if ( ! -f $cfgfname) {die("No '$cfgfname' found (pass in 'conf' if not in current dir)!");}
   # TODO: Eliminate the dirty backtick op.
-  my $cfg = decode_json(`cat $cfgfname`);
+  my $cont = `cat $cfgfname`;
+  $cont =~ s/\r//g;
+  my $cfg = decode_json($cont);
   my $vernew =  $cfg->{'version'};
   $cfg->{'date'} = $iso;
   # Release candidate (0 => ignore rc, this is an actual release)
@@ -252,8 +254,9 @@ sub deploytag {
    #for my $c (@cmds) {
    #   print(STDERR "$c\n");
    #}
-   # FETCH !
+   # FETCH ! NOTE: This does not seem to get(fetch ?) 'master' branch (!!) "git pull origin master" does !
    my $out = `$cmds[0]`;
+   print(STDERR "Fetch branch/tag ''by cmd: $cmds[0]\n");
    if ($?) { die("Git Fetch failed: $out"); }
    # Query tags (again)
    my @tags = $cfg->gettags();
