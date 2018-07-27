@@ -469,10 +469,10 @@ sub parselintreport {
   return (\@report);
 }
 # TODO: How do we know where *application code* (not dependencies) reside
-# export NODEGIT_APPCODE_PATH="./sjs:./client/app:./bms:./utils:./devutil"
+# export NODEGIT_APPCODE_PATH="./sjs:./bms:./utils:./devutil:./client/app:./client/components:./client/js:"
 # export NODEGIT_LINTER=jshint
 # export NODEGIT_LINTMAX=5
-# export NODEGIT_CODEFILE_PATT=js|json
+# export NODEGIT_CODEFILE_PATT="js|json"
 # export NODEGIT_LINT_VCINFO=1
 sub lint {
   my ($cfg, $opts) = @_; #  
@@ -494,13 +494,13 @@ sub lint {
   my $i = 0;
   my $vcinfo = $ENV{'NODEGIT_LINT_VCINFO'} || $opts->{'vcinfo'} || 0; # Add info from VC
   foreach my $fn (@codefiles) {
-	
+	print(STDERR "File: $fn:\n"); # .$info
 	my $lis = $vcinfo ? lineinfo($fn) : []; # Info from vc
 	
 	my $info = `$lint $fn`;
 	$i++;
 	if (!$info) { next; }
-	#print("File: $fn:\n".$info);
+	
 	if ($lintmax && ($i > $lintmax)) { last; }
 	my $rep = { "filename" => $fn }; # "info" => $info
 	$info = $rep->{'info'} = parselintreport($info);
@@ -527,12 +527,13 @@ sub lineinfo {
   my $vctype = "git";
   #for (@vctypes) { if (-d "./.$_") { $vctype = $_; last; } }
   my @info = `$vctype blame $fname`;
+  if ($?) { return []; }
   @info = map({
 	  # Note: single space match requirement before final (.+) / $3 breaks matching
 	  $_ =~ /^([^\(]+)\s+\(([^\)]+)\)(.+)$/;
 	  my $i = {"hash" => $1,  "linecont" => $3}; # info => $2,
 	  my @subinfo = split(/\s+/, $2);
-	  $i->{'lineno'}   = int( pop(@subinfo) );
+	  $i->{'lineno'}   = int( pop(@subinfo) ); # Got "(P" ?
 	  $i->{'datetime'} = join(' ', splice(@subinfo, -3));
 	  $i->{'author'}   = join(' ', @subinfo);
 	  #print( Dumper($i) );
