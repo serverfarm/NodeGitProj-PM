@@ -10,7 +10,9 @@ use JSON; # libjson-perl (libjson-pp-perl)
 use Mail::Sendmail; # libmail-sendmail-perl
 use Date::ISO8601;  # libdate-iso8601-perl
 use Sys::Hostname; # CORE
-use Cwd;
+use Cwd; # CORE
+use File::Find; # CORE
+
 our $VERSION = '0.1.2';
 # my $appcfgfname = "$appid.conf.json";
 
@@ -396,7 +398,148 @@ sub deps_install {
   chdir($cwd);
   #if ($?) {print(STDERR "Error from Bower Install (in '$docroot'): $?");}
 }
+=head2 $np->deps_check();
 
+Provide a superficial dependency version check of NPM packages.
+Iterate through dependencies in package.json and look them up in (their respective installation directories in) the filesystem.
+
+=cut
+sub deps_check {
+  my ($cfg, $opts) = @_;
+  my $modpath = "./node_modules";
+  if ( ! -d $modpath ) { die("No module path '$modpath'"); }
+  #print(Dumper($cfg));
+  my $deps = $cfg->{'dependencies'};
+  if (!$deps || (keys(%$deps) < 1)) { die ("No dependencies"); }
+  my @deps = ();
+  for my $k (keys(%{$deps})) {
+	my $cmp = '';
+	my $ver = '';
+	if ($deps->{$k} !~ /^\D?\d+\.\d+\.\d+$/) { 
+	  #print("Non-digit: deps->{$k}\n");
+	  $ver = '';
+	}
+	#if ($deps->{$k} !~ /^(\D)(\d+\.){3}$/) {}
+	elsif ($deps->{$k} =~ s/^(\D)?//) { $cmp = $1; $ver = $deps->{$k}; };
+	# else {}
+	#print("$k => $deps->{$k} (CMP: $cmp)\n");
+	my $modinfo = { "id" => $k, "ver" => $ver };
+	if ($cmp) { $modinfo->{'cmp'} = $cmp; }
+	push(@deps, $modinfo);
+  }
+  #print(Dumper(\@deps));
+  for my $mi (@deps) {
+	 if (!-d "$modpath/$mi->{'id'}") { push(@{$mi->{'errors'}}, "Missing module dir"); next; }
+	 if (!-f "$modpath/$mi->{'id'}/package.json") { push(@{$mi->{'errors'}}, "Missing module package.json"); next; }
+	 my $cont = `cat $modpath/$mi->{'id'}/package.json`;
+	 my $pkg = decode_json($cont);
+	 #print(Dumper($pkg));
+	 if ($pkg->{'name'}    ne $mi->{'id'})  { push(@{$mi->{'errors'}}, "Non-matching module id ($pkg->{'name'} vs. $mi->{'id'})"); }
+	 if ($mi->{'ver'} && ($pkg->{'version'} ne $mi->{'ver'})) { push(@{$mi->{'errors'}}, "Non-matching module version ($pkg->{'version'} vs. $mi->{'ver'})"); }
+	 
+  }
+  #print(Dumper(\@deps));
+  my $onlyerrors = $opts->{onlyerrors};
+  if ($onlyerrors) { @deps = grep({ $_->{'errors'}; } @deps); }
+  return(\@deps);
+}
+my @codefiles = ();
+my $codefiles_patt = '';
+# File::Find callback for finding code files (by $codefiles_patt)
+sub fstree_process {
+  my ($foo) = @_;
+  #print("$File::Find::name\n");
+  if ($File::Find::name =~ /\.$codefiles_patt$/) { push(@codefiles, $File::Find::name); }
+}
+sub parselintreport {
+  my ($infostr) = @_;
+  my @lines = split (/\n/, $infostr);
+  #m y $len = scalar(@lines); # Number of items - redundant with negative offset
+  splice (@lines, -2);
+  #print (Dumper(\@lines));
+  my @report = ();
+  foreach my $line (@lines) {
+	  $line =~ s/[^:]:\s*//; # Get rid of filename
+	  my @errarr = split (/,\s*/, $line, 3);
+	  my $err = {msg => $errarr[2]};
+	  if ($errarr[0] =~ m/line\s*(\d+)/) { $err->{line} = int($1); }
+	  if ($errarr[1] =~ m/col\s*(\d+)/)  { $err->{col}  = int($1); }
+	  push (@report, $err);
+  }
+  return (\@report);
+}
+# TODO: How do we know where *application code* (not dependencies) reside
+# export NODEGIT_APPCODE_PATH="./sjs:./client/app:./bms:./utils:./devutil"
+# export NODEGIT_LINTER=jshint
+# export NODEGIT_LINTMAX=5
+# export NODEGIT_CODEFILE_PATT=js|json
+# export NODEGIT_LINT_VCINFO=1
+sub lint {
+  my ($cfg, $opts) = @_; #  
+  $codefiles_patt = 'js|json'; # Default
+  my @path =  split(/:/, $ENV{'NODEGIT_APPCODE_PATH'});
+  if (!@path) { die("No NODEGIT_APPCODE_PATH in env ! (Set to paths from where you want to lint the files)"); }
+  my $lint = $ENV{'NODEGIT_LINTER'};
+  if (!$lint) { die("No NODEGIT_LINTER in env ! (Set to linter executable)"); }
+  my $lintmax = $ENV{'NODEGIT_LINTMAX'} ? int($ENV{'NODEGIT_LINTMAX'}) : 0;
+  if ($ENV{'NODEGIT_CODEFILE_PATT'}) { $codefiles_patt = $ENV{'NODEGIT_CODEFILE_PATT'}; }
+  print(STDERR "Searching code from path: ".Dumper(\@path));
+  # TODO: Check presence of directories ...
+  
+  # follow_fast
+  File::Find::find({ wanted => \&fstree_process, follow => 0, no_chdir => 1}, @path);
+  print(STDERR scalar(@codefiles)." files to analyze\n");
+  #print(Dumper(\@codefiles));
+  my @filereports = ();
+  my $i = 0;
+  my $vcinfo = $ENV{'NODEGIT_LINT_VCINFO'} || $opts->{'vcinfo'} || 0; # Add info from VC
+  foreach my $fn (@codefiles) {
+	
+	my $lis = $vcinfo ? lineinfo($fn) : []; # Info from vc
+	
+	my $info = `$lint $fn`;
+	$i++;
+	if (!$info) { next; }
+	#print("File: $fn:\n".$info);
+	if ($lintmax && ($i > $lintmax)) { last; }
+	my $rep = { "filename" => $fn }; # "info" => $info
+	$info = $rep->{'info'} = parselintreport($info);
+	if ($vcinfo) { xclate($info, $lis); }
+	push(@filereports, $rep); 
+  }
+  #print(Dumper(\@filereports));
+  return \@filereports;
+}
+
+sub xclate {
+  my ($info, $lis) = @_;
+  foreach my $ei (@$info) {
+	my $li = $lis->[ $ei->{'line'} - 1 ];
+	@$ei{'author','datetime'} = @$li{'author','datetime'};
+  }
+}
+# Keep this to Git-only or support SVN as well ?
+sub lineinfo {
+  my ($fname) = @_;
+  #print(STDERR "File: $fname\n");
+  # Inquiry version control type here (.git ? .svn ?). TODO: In more global place
+  #my @vctypes = ('git','svn'); # Luckily these happen to be VC executable names too
+  my $vctype = "git";
+  #for (@vctypes) { if (-d "./.$_") { $vctype = $_; last; } }
+  my @info = `$vctype blame $fname`;
+  @info = map({
+	  # Note: single space match requirement before final (.+) / $3 breaks matching
+	  $_ =~ /^([^\(]+)\s+\(([^\)]+)\)(.+)$/;
+	  my $i = {"hash" => $1,  "linecont" => $3}; # info => $2,
+	  my @subinfo = split(/\s+/, $2);
+	  $i->{'lineno'}   = int( pop(@subinfo) );
+	  $i->{'datetime'} = join(' ', splice(@subinfo, -3));
+	  $i->{'author'}   = join(' ', @subinfo);
+	  #print( Dumper($i) );
+	  $i;
+  } @info);
+  return(\@info);
+}
 =head1 TODO
 
 Utilize "scripts" and "config" sections of package.json more effectively.

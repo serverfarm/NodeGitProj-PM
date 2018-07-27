@@ -2,6 +2,7 @@
 # Deploy prepper with minimal dependenceies for a Node.js / NPM / Git project.
 # http://stackoverflow.com/questions/5195859/push-a-tag-to-a-remote-repository-using-git
 # http://semver.org/
+# https://metacpan.org/pod/CPAN::Meta::Spec
 # To Install easier on Win/MacOSX, Install cpanminus
 =head1 NAME
 
@@ -60,7 +61,7 @@ use Sys::Hostname; # CORE
 use NodeGitProj;
 use strict;
 use warnings;
-my @pspec = ('version=s', 'exec','nocheck','force','conf=s');
+my @pspec = ('version=s', 'exec','nocheck','force','conf=s', 'vcinfo', 'maxlines=i'); #
 my %para = ('version' => '', 'conf' => './package.json');
 my $op = shift(@ARGV) || '';
 GetOptions (\%para, @pspec);
@@ -145,6 +146,36 @@ my $ops = {
      my ($cfg) = @_;
      $cfg->deps_install();
   },
+  # Dependencies version check.
+  # TODO: Allow passing a template through env variable ?
+  'depscheck' => sub {
+	my ($cfg) = @_;
+	my $moderrs = $cfg->deps_check({onlyerrors => 1});
+	my $json = JSON->new->allow_nonref()->pretty;
+	print($json->encode( $moderrs )); # pretty->
+	#print(Dumper($moderrs));
+  },
+  'lint' => sub {
+	my ($cfg) = @_;
+	my $reps = $cfg->lint(\%para);
+	my $json = JSON->new->allow_nonref()->pretty;
+	print($json->encode( $reps ));
+  },
+  'lintrep' => sub {
+	my ($cfg) = @_;
+	my $d = $ENV{'LR_DATA'}; #export LR_DATA=
+	my $t = $ENV{'LR_TMPL'}; #export LR_TMPL=
+	my %ttopt = (TYPE => 'FILE',  SOURCE => $t, DELIMITERS => ["<%", "%>"]);
+	my %ttfillopt = ();
+	# Compact, beta-test nature reporting, not fully mature
+	if ($d && $t) { eval("use Text::Template;use JSON;");
+		my $tt = Text::Template->new(%ttopt);
+		my $dj = decode_json(scalar(`cat $d`));
+		print $tt->fill_in(HASH => {data => $dj});exit;
+	}
+	print(STDERR "Not implemented !");
+  },
+  
   # Increment RC number to the next available one (<= 99)
   #'rcinc' => sub {};
 };
