@@ -494,7 +494,7 @@ sub lint {
   my $i = 0;
   my $vcinfo = $ENV{'NODEGIT_LINT_VCINFO'} || $opts->{'vcinfo'} || 0; # Add info from VC
   foreach my $fn (@codefiles) {
-	print(STDERR "File: $fn\n"); # .$info
+	print(STDERR "$i) $fn\n"); # .$info
 	my $lis = $vcinfo ? lineinfo($fn) : []; # Info from vc
 	
 	my $info = `$lint $fn`;
@@ -539,9 +539,13 @@ sub lineinfo {
 	  # Sample problem line:
 	  # 2d14e4e6 (ZZZZ Service account (P) 2015-06-29 22:46:00 -0700  4) var sys = require('sys');
 	  # d3795ce2 rackview.js           ((no author)     2015-04-14 02:37:35 +0000   3) /** @file
-	  $i->{'lineno'}   = int( pop(@subinfo) ); # Got "(P" ?
-	  $i->{'datetime'} = join(' ', splice(@subinfo, -3));
-	  $i->{'author'}   = join(' ', @subinfo);
+	  $i->{'lineno'}   = int( pop(@subinfo) ); # Got "(P" ? ... Not numeric
+	  # MUST Check that we have 3 items to remove
+	  if (scalar(@subinfo) < 3) { }
+	  else {
+	    $i->{'datetime'} = join(' ', splice(@subinfo, -3));
+	    $i->{'author'}   = join(' ', @subinfo);
+      }
 	  #print( Dumper($i) );
 	  $i;
   } @info);
