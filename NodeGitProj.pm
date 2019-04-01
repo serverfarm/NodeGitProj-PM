@@ -28,6 +28,7 @@ NodeGitProj - Manage the Deployment lifecycle of Git Stored Node.js App.
       $np = NodeGitProj->new('conf' => "/path/to/package.json");
       $np->deploytag($ver);
       $np->deps_install();
+      $np->db_migrate();
       $np->server_restart();
       $np->inform("Ver. $ver Deployed");
     };
@@ -398,6 +399,21 @@ sub deps_install {
   chdir($cwd);
   #if ($?) {print(STDERR "Error from Bower Install (in '$docroot'): $?");}
 }
+
+=head2 $np->db_migrate()
+
+Migrate Database Schema.
+Evolutionary migrate database schema based on Sequelize migrations.
+
+=cut
+sub db_migrate {
+  my ($cfg) = @_;
+  # Ensure sequelize cli is installed 
+  if (-e 'sequelize' && -x _) {die("No sequelize cli found");}
+  # Sequelize migrate
+  `sequelize db:migrate`;
+}
+
 =head2 $np->deps_check();
 
 Provide a superficial dependency version check of NPM packages.
