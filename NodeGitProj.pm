@@ -387,15 +387,15 @@ sub deps_install {
   # Ensure docroot exists
   if (! -d $docroot) {die("No static content root found ('$docroot')");}
   # Ensure docroot has bower.json and "bower_components"
-  if (! -f "$docroot/bower.json") {die("No bower.json found");}
-  if (! -d "$docroot/bower_components") {die("No 'bower_components' in docroot !");}
+  if (! -f "$docroot/package.json") {die("No package.json found");}
+  if (! -d "$docroot/node_modules") {die("No 'node_modules' in docroot !");}
   # NPM
   # Must have existing "node_modules" (makes this not valid for first time install)
   if (-d "./node_modules") { `npm install`; }
   # Bower
   my $cwd = getcwd();
   chdir($docroot);
-  `bower install`;
+  `npm install`;
   chdir($cwd);
   #if ($?) {print(STDERR "Error from Bower Install (in '$docroot'): $?");}
 }
